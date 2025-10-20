@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python plt_to_pdf.py:*)",
+      "Read(//Users/sarperyeniceri/.Trash/plt_to_pdf/**)",
+      "Bash(python plt_to_pdf_converter.py:*)",
+      "Bash(python -c:*)",
+      "Bash(python plt_to_pdf_a4.py:*)",
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nPLT to PDF converter - Initial version\n\n- Convert PLT (HPGL) files to PDF at real scale\n- Support for single-page full-scale output\n- Support for multi-page A4 output\n- 2cm margins on all pages\n- Automatic input/output folder structure\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix scale and improve PLT parsing\n\n- Confirmed correct scale: 1016 units/inch (verified with print test)\n- Fixed PD command parsing (pen down before drawing)\n- Added support for multiple coordinates in single command\n- All lines now render correctly (835 segments)\n- 2cm margins on all outputs\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

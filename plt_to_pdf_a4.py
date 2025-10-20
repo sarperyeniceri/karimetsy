@@ -18,7 +18,7 @@ class PLTtoPDFA4Converter:
         self.pdf_file = pdf_file
 
         # HPGL birimlerini mm'ye çevirme (1016 HPGL units per inch)
-        self.unit_to_mm = 25.4 / 1016
+        self.unit_to_mm = 25.4 / 1016  # ≈ 0.025
 
         # A4 boyutları
         self.a4_width = 210  # mm
