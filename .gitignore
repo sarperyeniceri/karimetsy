@@ -1,0 +1,29 @@
+# PLT input dosyaları
+input_plt/*.plt
+input_plt/*.PLT
+
+# PDF output dosyaları
+output_pdf/*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
