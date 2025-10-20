@@ -6,9 +6,11 @@ PLT (HPGL) dosyalarını gerçek ölçeğinde PDF'e çeviren basit bir Python pr
 
 ```
 sarpapp/
-├── plt_to_pdf.py        # Ana program
-├── input_plt/           # PLT dosyalarını buraya koyun
-└── output_pdf/          # PDF dosyaları buraya kaydedilir
+├── plt_to_pdf.py              # Tek sayfa gerçek ölçek
+├── plt_to_pdf_a4.py           # A4 sayfalarına bölünmüş
+├── plt_to_pdf_a4_overlay.py   # A4 + 2cm yapıştırma alanları
+├── input_plt/                 # PLT dosyalarını buraya koyun
+└── output_pdf/                # PDF dosyaları buraya kaydedilir
 ```
 
 ## Kurulum
@@ -25,16 +27,33 @@ pip install reportlab
 
 PLT dosyalarınızı `input_plt` klasörüne kopyalayın.
 
-### Adım 2: Programı Çalıştırın
+### Adım 2: Programı Seçin ve Çalıştırın
 
+**Seçenek 1: Tek Sayfa Gerçek Ölçek**
 ```bash
 python plt_to_pdf.py
 ```
+- Tüm çizim tek sayfada
+- Gerçek ölçekte (örn: 114 cm x 89 cm)
+- 2 cm margin
 
-Program otomatik olarak:
-- `input_plt` klasöründeki tüm PLT dosyalarını bulur
-- Her birini PDF'e çevirir
-- PDF'leri `output_pdf` klasörüne kaydeder
+**Seçenek 2: A4 Sayfalarına Bölünmüş**
+```bash
+python plt_to_pdf_a4.py
+```
+- Çizim A4 sayfalarına bölünür
+- Her sayfada 2 cm margin
+- Sayfa etiketleri (A1, A2, B1, vb.)
+
+**Seçenek 3: A4 + Yapıştırma Alanları (ÖNERİLEN)**
+```bash
+python plt_to_pdf_a4_overlay.py
+```
+- Çizim A4 sayfalarına bölünür
+- **2 cm overlap (bindirme) alanları**
+- Komşu sayfalar birbirine tam oturur
+- Kesikli çizgiler yapıştırma sınırlarını gösterir
+- Yazdırıp yapıştırarak gerçek ölçekli kalıp elde edilir
 
 ### Örnek Çıktı
 
@@ -69,7 +88,9 @@ DÖNÜŞTÜRME ÖZETİ:
 ## Özellikler
 
 - ✓ HPGL (PLT) formatını okur
-- ✓ Gerçek ölçekte PDF oluşturur
+- ✓ Gerçek ölçekte PDF oluşturur (yazıcıda test edildi)
+- ✓ Üç farklı çıktı modu (tek sayfa / A4 / A4+overlap)
+- ✓ Yapıştırma için 2cm overlap alanları
 - ✓ Toplu dönüştürme (birden fazla dosya)
 - ✓ Otomatik sayfa boyutu hesaplama
 - ✓ Klasör tabanlı kolay kullanım
