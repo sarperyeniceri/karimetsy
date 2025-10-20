@@ -190,17 +190,6 @@ class PLTtoPDFA4Converter:
                     py2 = (y2 - page_start_y + self.margin) * mm
                     c.line(px1, py1, px2, py2)
 
-                # Margin çerçevesi (kesikli gri çizgi)
-                c.setStrokeColorRGB(0.7, 0.7, 0.7)
-                c.setLineWidth(0.3)
-                c.setDash([2, 2])
-                margin_rect_x = self.margin * mm
-                margin_rect_y = self.margin * mm
-                margin_rect_w = printable_width * mm
-                margin_rect_h = printable_height * mm
-                c.rect(margin_rect_x, margin_rect_y, margin_rect_w, margin_rect_h, stroke=1, fill=0)
-                c.setDash()  # Reset
-
                 # Sayfa etiketi (A1, A2, B1, B2 şeklinde)
                 c.setFillColorRGB(0, 0, 0)
                 c.setFont("Helvetica-Bold", 12)
