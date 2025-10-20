@@ -143,12 +143,17 @@ class PLTtoPDFA4OverlayConverter:
 
         print(f"Çizim boyutu: {width_mm:.1f} mm x {height_mm:.1f} mm")
 
-        # A4'lere bölme hesabı (overlap olmadan - içerik alanı)
+        # A4'lere bölme hesabı
+        # Overlap göz önüne alınarak: Her sayfa kendi alanı + komşu overlap'ler
         printable_width = self.a4_width - (2 * self.margin)  # 170 mm
         printable_height = self.a4_height - (2 * self.margin)  # 257 mm
 
-        cols = int((width_mm + printable_width - 1) / printable_width)
-        rows = int((height_mm + printable_height - 1) / printable_height)
+        # Sayfalar arası overlap olduğu için efektif alan overlap kadar küçük
+        effective_width = printable_width - self.overlap  # 150 mm
+        effective_height = printable_height - self.overlap  # 237 mm
+
+        cols = int((width_mm + effective_width - 1) / effective_width)
+        rows = int((height_mm + effective_height - 1) / effective_height)
 
         print(f"A4 grid: {rows} satır x {cols} sütun = {rows * cols} sayfa")
         print(f"2cm overlap alanları ekleniyor...")
@@ -162,28 +167,22 @@ class PLTtoPDFA4OverlayConverter:
 
         for row in range(rows):
             for col in range(cols):
-                # Bu sayfada gösterilecek alan (overlap olmadan)
-                page_start_x = col * printable_width
-                page_start_y = row * printable_height
+                # Her sayfa effective_width kadar ilerler (overlap hariç)
+                # Ama gösterdiği alan printable_width kadardır (overlap dahil)
+                page_start_x = col * effective_width
+                page_start_y = row * effective_height
                 page_end_x = page_start_x + printable_width
                 page_end_y = page_start_y + printable_height
 
-                # Overlap ile genişletilmiş alan
-                # Sol kenarda overlap var mı? (col > 0 ise sol tarafta sayfa var)
-                expanded_start_x = page_start_x - (self.overlap if col > 0 else 0)
-                # Sağ kenarda overlap var mı? (col < cols-1 ise sağ tarafta sayfa var)
-                expanded_end_x = page_end_x + (self.overlap if col < cols - 1 else 0)
-                # Üst kenarda overlap var mı? (row > 0 ise üstte sayfa var)
-                expanded_start_y = page_start_y - (self.overlap if row > 0 else 0)
-                # Alt kenarda overlap var mı? (row < rows-1 ise altta sayfa var)
-                expanded_end_y = page_end_y + (self.overlap if row < rows - 1 else 0)
+                # Not: page_end_x = col * 150 + 170 = col * 150 + 150 + 20 = (col+1) * 150 + 20
+                # Yani her sayfa overlap kadar sonraki sayfayla örtüşür
 
-                # Bu sayfadaki çizgileri filtrele (genişletilmiş alandan)
+                # Bu sayfadaki çizgileri filtrele
                 page_lines = []
                 for (x1, y1), (x2, y2) in normalized_lines:
-                    # Çizgi bu sayfa alanında mı? (overlap dahil)
-                    if (min(x1, x2) < expanded_end_x and max(x1, x2) > expanded_start_x and
-                        min(y1, y2) < expanded_end_y and max(y1, y2) > expanded_start_y):
+                    # Çizgi bu sayfa alanında mı?
+                    if (min(x1, x2) < page_end_x and max(x1, x2) > page_start_x and
+                        min(y1, y2) < page_end_y and max(y1, y2) > page_start_y):
                         page_lines.append(((x1, y1), (x2, y2)))
 
                 # Boş sayfa atlama
@@ -192,15 +191,6 @@ class PLTtoPDFA4OverlayConverter:
 
                 page_count += 1
 
-                # Sayfa bilgisini sakla
-                pages_info[(row, col)] = {
-                    'lines': page_lines,
-                    'start_x': page_start_x,
-                    'start_y': page_start_y,
-                    'expanded_start_x': expanded_start_x,
-                    'expanded_start_y': expanded_start_y
-                }
-
                 # Çizgileri çiz
                 c.setStrokeColorRGB(0, 0, 0)
                 c.setLineWidth(0.5)
@@ -208,15 +198,11 @@ class PLTtoPDFA4OverlayConverter:
                 c.setLineJoin(1)
 
                 for (x1, y1), (x2, y2) in page_lines:
-                    # Sayfa koordinatlarına çevir (genişletilmiş alana göre)
-                    # Sol ve üst overlap alanını hesaba kat
-                    left_offset = self.overlap if col > 0 else 0
-                    top_offset = self.overlap if row > 0 else 0
-
-                    px1 = (x1 - expanded_start_x + self.margin) * mm
-                    py1 = (y1 - expanded_start_y + self.margin) * mm
-                    px2 = (x2 - expanded_start_x + self.margin) * mm
-                    py2 = (y2 - expanded_start_y + self.margin) * mm
+                    # Sayfa koordinatlarına çevir
+                    px1 = (x1 - page_start_x + self.margin) * mm
+                    py1 = (y1 - page_start_y + self.margin) * mm
+                    px2 = (x2 - page_start_x + self.margin) * mm
+                    py2 = (y2 - page_start_y + self.margin) * mm
                     c.line(px1, py1, px2, py2)
 
                 # Overlap sınırlarını kesikli çizgilerle göster
@@ -224,24 +210,16 @@ class PLTtoPDFA4OverlayConverter:
                 c.setLineWidth(0.3)
                 c.setDash([3, 3])
 
-                # Sol kenar overlap sınırı (eğer sol tarafta sayfa varsa)
-                if col > 0:
-                    x_pos = (self.margin + self.overlap) * mm
-                    c.line(x_pos, self.margin * mm, x_pos, (self.a4_height - self.margin) * mm)
-
-                # Sağ kenar overlap sınırı (eğer sağ tarafta sayfa varsa)
+                # Sağ kenar overlap sınırı (sonraki sayfayla örtüşen alan)
                 if col < cols - 1:
-                    x_pos = (self.a4_width - self.margin - self.overlap) * mm
+                    # effective_width noktasında çizgi çiz (170-20=150mm'de)
+                    x_pos = (self.margin + effective_width) * mm
                     c.line(x_pos, self.margin * mm, x_pos, (self.a4_height - self.margin) * mm)
 
-                # Üst kenar overlap sınırı (eğer üstte sayfa varsa)
-                if row > 0:
-                    y_pos = (self.a4_height - self.margin - self.overlap) * mm
-                    c.line(self.margin * mm, y_pos, (self.a4_width - self.margin) * mm, y_pos)
-
-                # Alt kenar overlap sınırı (eğer altta sayfa varsa)
+                # Alt kenar overlap sınırı (sonraki sayfayla örtüşen alan)
                 if row < rows - 1:
-                    y_pos = (self.margin + self.overlap) * mm
+                    # effective_height noktasında çizgi çiz
+                    y_pos = (self.margin + effective_height) * mm
                     c.line(self.margin * mm, y_pos, (self.a4_width - self.margin) * mm, y_pos)
 
                 c.setDash()  # Reset
@@ -260,14 +238,10 @@ class PLTtoPDFA4OverlayConverter:
                 # Yapıştırma talimatları
                 c.setFont("Helvetica", 6)
                 instructions = []
-                if col > 0:
-                    instructions.append("Sol kenar: yapıştır")
                 if col < cols - 1:
-                    instructions.append("Sağ kenar: yapıştır")
-                if row > 0:
-                    instructions.append("Üst kenar: yapıştır")
+                    instructions.append(f"Sağ: {chr(65 + row)}{col + 2} ile yapıştır")
                 if row < rows - 1:
-                    instructions.append("Alt kenar: yapıştır")
+                    instructions.append(f"Alt: {chr(65 + row + 1)}{col + 1} ile yapıştır")
 
                 if instructions:
                     c.drawString(10 * mm, 15 * mm, " | ".join(instructions))
