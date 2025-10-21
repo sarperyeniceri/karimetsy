@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 PLT dosyasını A4 sayfalarına bölerek PDF'e çevirme programı
+Print ekranı mantığıyla 2cm overlap
 """
 
 import re
@@ -12,34 +13,31 @@ import os
 from glob import glob
 
 
-class PLTtoPDFA4Converter:
+class PLTtoPDFA4OverlayConverter:
     def __init__(self, plt_file, pdf_file):
         self.plt_file = plt_file
         self.pdf_file = pdf_file
 
         # HPGL birimlerini mm'ye çevirme (1016 HPGL units per inch)
-        self.unit_to_mm = 25.4 / 1016  # ≈ 0.025
+        self.unit_to_mm = 25.4 / 1016
 
         # A4 boyutları
         self.a4_width = 210  # mm
         self.a4_height = 297  # mm
-        self.margin = 20  # 2 cm margin
+        self.overlap = 20  # 2 cm overlap
 
     def parse_plt(self):
         """PLT dosyasını oku ve komutları ayrıştır"""
         with open(self.plt_file, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
 
-        # Boşlukları ve satır sonlarını temizle
         content = content.replace('\n', '').replace('\r', '').replace(' ', '')
-
-        # HPGL komutlarını bul - 2 harfli komut + parametreler
         pattern = r'([A-Z]{2})([^A-Z]*)'
         commands = re.findall(pattern, content)
         return commands
 
     def convert(self):
-        """PLT'den A4 PDF'lere dönüştür"""
+        """PLT'den A4 PDF'lere dönüştür (overlap ile)"""
         print(f"PLT dosyası okunuyor: {self.plt_file}")
         commands = self.parse_plt()
 
@@ -53,7 +51,6 @@ class PLTtoPDFA4Converter:
         pen_down = False
 
         for cmd, params_str in commands:
-            # Parametreleri parse et
             params_str = params_str.replace(';', '').strip()
             params = []
             if params_str:
@@ -66,12 +63,12 @@ class PLTtoPDFA4Converter:
                         except ValueError:
                             pass
 
-            if cmd == 'PU':  # Pen Up
+            if cmd == 'PU':
                 pen_down = False
                 if len(params) >= 2:
                     x, y = params[0], params[1]
 
-            elif cmd == 'PD':  # Pen Down
+            elif cmd == 'PD':
                 pen_down = True
                 if len(params) >= 2:
                     new_x, new_y = params[0], params[1]
@@ -86,7 +83,7 @@ class PLTtoPDFA4Converter:
                         x, y = new_x, new_y
                         i += 2
 
-            elif cmd == 'PA':  # Plot Absolute
+            elif cmd == 'PA':
                 for i in range(0, len(params), 2):
                     if i + 1 < len(params):
                         new_x, new_y = params[i], params[i + 1]
@@ -94,7 +91,7 @@ class PLTtoPDFA4Converter:
                             lines.append(((x, y), (new_x, new_y)))
                         x, y = new_x, new_y
 
-            elif cmd == 'PR':  # Plot Relative
+            elif cmd == 'PR':
                 for i in range(0, len(params), 2):
                     if i + 1 < len(params):
                         new_x, new_y = x + params[i], y + params[i + 1]
@@ -102,7 +99,7 @@ class PLTtoPDFA4Converter:
                             lines.append(((x, y), (new_x, new_y)))
                         x, y = new_x, new_y
 
-            elif cmd == 'IN':  # Initialize
+            elif cmd == 'IN':
                 x, y = 0, 0
                 pen_down = False
 
@@ -127,7 +124,7 @@ class PLTtoPDFA4Converter:
         width_hpgl = max_x - min_x
         height_hpgl = max_y - min_y
 
-        # Normalize et (Y ekseni çevirmeden)
+        # Normalize et
         normalized_lines = []
         for (x1, y1), (x2, y2) in lines:
             nx1 = (x1 - min_x) * self.unit_to_mm
@@ -141,15 +138,16 @@ class PLTtoPDFA4Converter:
 
         print(f"Çizim boyutu: {width_mm:.1f} mm x {height_mm:.1f} mm")
 
-        # A4'lere bölme hesabı
-        # Margin sadece dış kenarlarda, ortada değil - bu yüzden tam A4 kullan
-        printable_width = self.a4_width  # 210 mm (tam sayfa)
-        printable_height = self.a4_height  # 297 mm (tam sayfa)
+        # Print ekranı mantığı: Her sayfa overlap kadar daha az ilerler
+        # Örnek: A4 210mm, overlap 20mm → her sayfa 190mm ilerler
+        step_width = self.a4_width - self.overlap  # 190 mm
+        step_height = self.a4_height - self.overlap  # 277 mm
 
-        cols = int((width_mm + printable_width - 1) / printable_width)
-        rows = int((height_mm + printable_height - 1) / printable_height)
+        cols = int((width_mm + step_width - 1) / step_width)
+        rows = int((height_mm + step_height - 1) / step_height)
 
         print(f"A4 grid: {rows} satır x {cols} sütun = {rows * cols} sayfa")
+        print(f"2cm overlap ile...")
 
         # PDF oluştur
         c = canvas.Canvas(self.pdf_file, pagesize=A4)
@@ -157,21 +155,19 @@ class PLTtoPDFA4Converter:
 
         for row in range(rows):
             for col in range(cols):
-                # Bu sayfada gösterilecek alan
-                page_start_x = col * printable_width
-                page_start_y = row * printable_height
-                page_end_x = page_start_x + printable_width
-                page_end_y = page_start_y + printable_height
+                # Her sayfa step kadar ilerler, ama tam A4 gösterir
+                page_start_x = col * step_width
+                page_start_y = row * step_height
+                page_end_x = page_start_x + self.a4_width
+                page_end_y = page_start_y + self.a4_height
 
                 # Bu sayfadaki çizgileri filtrele
                 page_lines = []
                 for (x1, y1), (x2, y2) in normalized_lines:
-                    # Çizgi bu sayfa alanında mı?
                     if (min(x1, x2) < page_end_x and max(x1, x2) > page_start_x and
                         min(y1, y2) < page_end_y and max(y1, y2) > page_start_y):
                         page_lines.append(((x1, y1), (x2, y2)))
 
-                # Boş sayfa atlama
                 if not page_lines:
                     continue
 
@@ -183,30 +179,40 @@ class PLTtoPDFA4Converter:
                 c.setLineCap(1)
                 c.setLineJoin(1)
 
-                # Margin hesapla (sadece dış kenarlarda)
-                left_margin = self.margin if col == 0 else 0
-                right_margin = self.margin if col == cols - 1 else 0
-                top_margin = self.margin if row == 0 else 0
-                bottom_margin = self.margin if row == rows - 1 else 0
-
                 for (x1, y1), (x2, y2) in page_lines:
-                    # Sayfa koordinatlarına çevir
-                    px1 = (x1 - page_start_x + left_margin) * mm
-                    py1 = (y1 - page_start_y + bottom_margin) * mm
-                    px2 = (x2 - page_start_x + left_margin) * mm
-                    py2 = (y2 - page_start_y + bottom_margin) * mm
+                    px1 = (x1 - page_start_x) * mm
+                    py1 = (y1 - page_start_y) * mm
+                    px2 = (x2 - page_start_x) * mm
+                    py2 = (y2 - page_start_y) * mm
                     c.line(px1, py1, px2, py2)
 
-                # Sayfa etiketi (A1, A2, B1, B2 şeklinde)
+                # Overlap sınırlarını kesikli çizgilerle göster
+                c.setStrokeColorRGB(0.7, 0.7, 0.7)
+                c.setLineWidth(0.3)
+                c.setDash([3, 3])
+
+                # Sağda sayfa varsa, sağ kenarda overlap çizgisi
+                if col < cols - 1:
+                    x_pos = (self.a4_width - self.overlap) * mm
+                    c.line(x_pos, 0, x_pos, self.a4_height * mm)
+
+                # Altta sayfa varsa, alt kenarda overlap çizgisi
+                if row < rows - 1:
+                    y_pos = self.overlap * mm
+                    c.line(0, y_pos, self.a4_width * mm, y_pos)
+
+                c.setDash()
+
+                # Sayfa etiketi
                 c.setFillColorRGB(0, 0, 0)
                 c.setFont("Helvetica-Bold", 12)
                 page_label = f"{chr(65 + row)}{col + 1}"
-                c.drawString(10 * mm, (self.a4_height - 10) * mm, page_label)
+                c.drawString(5 * mm, (self.a4_height - 5) * mm, page_label)
 
-                # Bilgi metni
-                c.setFont("Helvetica", 8)
-                info = f"Sayfa {page_count} | Çizim: {width_mm:.0f}x{height_mm:.0f}mm | Grid: {row+1}/{rows}, {col+1}/{cols}"
-                c.drawString(10 * mm, 10 * mm, info)
+                # Bilgi
+                c.setFont("Helvetica", 7)
+                info = f"Sayfa {page_count} | 2cm overlap"
+                c.drawString(5 * mm, 5 * mm, info)
 
                 c.showPage()
 
@@ -216,22 +222,18 @@ class PLTtoPDFA4Converter:
 
 
 def main():
-    # Çalışma dizinini al
     script_dir = os.path.dirname(os.path.abspath(__file__))
     input_dir = os.path.join(script_dir, 'input_plt')
     output_dir = os.path.join(script_dir, 'output_pdf')
 
-    # Klasörlerin varlığını kontrol et
     if not os.path.exists(input_dir):
         os.makedirs(input_dir)
         print(f"'{input_dir}' klasörü oluşturuldu.")
-        print("Lütfen PLT dosyalarınızı bu klasöre koyun.")
         sys.exit(0)
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # input_plt klasöründeki tüm PLT dosyalarını bul
     plt_files = glob(os.path.join(input_dir, '*.plt')) + glob(os.path.join(input_dir, '*.PLT'))
 
     if not plt_files:
@@ -241,19 +243,18 @@ def main():
     print(f"\n{len(plt_files)} adet PLT dosyası bulundu.\n")
     print("=" * 60)
 
-    # Her dosyayı dönüştür
     success_count = 0
     fail_count = 0
 
     for plt_file in plt_files:
         filename = os.path.basename(plt_file)
-        pdf_filename = os.path.splitext(filename)[0] + '_A4.pdf'
+        pdf_filename = os.path.splitext(filename)[0] + '_A4_overlap.pdf'
         pdf_file = os.path.join(output_dir, pdf_filename)
 
         print(f"\n[{plt_files.index(plt_file) + 1}/{len(plt_files)}] İşleniyor: {filename}")
         print("-" * 60)
 
-        converter = PLTtoPDFA4Converter(plt_file, pdf_file)
+        converter = PLTtoPDFA4OverlayConverter(plt_file, pdf_file)
 
         try:
             if converter.convert():
@@ -266,7 +267,6 @@ def main():
             print(f"✗ Hata: {filename} - {str(e)}")
             fail_count += 1
 
-    # Özet
     print("\n" + "=" * 60)
     print(f"\nDÖNÜŞTÜRME ÖZETİ:")
     print(f"  Toplam dosya: {len(plt_files)}")
